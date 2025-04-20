@@ -15,26 +15,28 @@
   <div id="player" style="width:1px; height:1px; position:absolute; top:0; left:0;"></div>
 
   <script>
-    // Namespace matching your Android sender
     const NAMESPACE = 'urn:x-cast:com.example.youtube';
-
-    // Initialize the Cast Receiver Context
     const context = cast.framework.CastReceiverContext.getInstance();
-
-    // Keep track of our YouTube player
     let ytPlayer = null;
+    let youtubeApiReady = false;
 
-    // Called by the IFrame API once it’s loaded
+    // Called by the YouTube API when it’s ready
     function onYouTubeIframeAPIReady() {
-      // Will be created on-demand
+      youtubeApiReady = true;
+      console.log('✅ YouTube API is ready');
     }
 
-    // Create or load the YouTube player with a given videoId
     function createYouTubePlayer(videoId) {
+      if (!youtubeApiReady) {
+        console.warn('⏳ YouTube API not ready yet');
+        return;
+      }
+
       if (ytPlayer) {
         ytPlayer.loadVideoById(videoId);
         return;
       }
+
       ytPlayer = new YT.Player('player', {
         videoId: videoId,
         playerVars: {
@@ -49,7 +51,6 @@
       });
     }
 
-    // Listen for changes in player state and notify the sender
     function onPlayerStateChange(event) {
       let state = 'UNKNOWN';
       switch (event.data) {
@@ -63,21 +64,21 @@
           state = 'PAUSED';
           break;
       }
-      context.sendCustomMessage(NAMESPACE, undefined, { state: state });
+      context.sendCustomMessage(NAMESPACE, undefined, { state });
     }
 
-    // Handle incoming custom messages from the Android sender
     context.addCustomMessageListener(NAMESPACE, event => {
+      console.log('📩 Received custom message:', event.data);
       let data = event.data;
-      // sometimes event.data is a string, sometimes already an object
       if (typeof data === 'string') data = JSON.parse(data);
       if (data.videoId) {
         createYouTubePlayer(data.videoId);
       }
     });
 
-    // Start the receiver
+    // Start Cast context
     context.start();
+    console.log('🚀 Cast Receiver started');
   </script>
 </body>
 </html>
