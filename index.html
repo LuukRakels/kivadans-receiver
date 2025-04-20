@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>KivaDans Custom Receiver</title>
+
+  <!-- Cast Application Framework -->
+  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+  <!-- YouTube IFrame API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body style="margin:0; padding:0; overflow:hidden; background-color:black;">
+
+  <!-- Hidden YouTube player container -->
+  <div id="player" style="width:1px; height:1px; position:absolute; top:0; left:0;"></div>
+
+  <script>
+    // Namespace matching your Android sender
+    const NAMESPACE = 'urn:x-cast:com.example.youtube';
+
+    // Initialize the Cast Receiver Context
+    const context = cast.framework.CastReceiverContext.getInstance();
+
+    // Keep track of our YouTube player
+    let ytPlayer = null;
+
+    // Called by the IFrame API once it’s loaded
+    function onYouTubeIframeAPIReady() {
+      // Will be created on-demand
+    }
+
+    // Create or load the YouTube player with a given videoId
+    function createYouTubePlayer(videoId) {
+      if (ytPlayer) {
+        ytPlayer.loadVideoById(videoId);
+        return;
+      }
+      ytPlayer = new YT.Player('player', {
+        videoId: videoId,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          modestbranding: 1
+        },
+        events: {
+          onReady: event => event.target.playVideo(),
+          onStateChange: onPlayerStateChange
+        }
+      });
+    }
+
+    // Listen for changes in player state and notify the sender
+    function onPlayerStateChange(event) {
+      let state = 'UNKNOWN';
+      switch (event.data) {
+        case YT.PlayerState.ENDED:
+          state = 'IDLE';
+          break;
+        case YT.PlayerState.PLAYING:
+          state = 'PLAYING';
+          break;
+        case YT.PlayerState.PAUSED:
+          state = 'PAUSED';
+          break;
+      }
+      context.sendCustomMessage(NAMESPACE, undefined, { state: state });
+    }
+
+    // Handle incoming custom messages from the Android sender
+    context.addCustomMessageListener(NAMESPACE, event => {
+      let data = event.data;
+      // sometimes event.data is a string, sometimes already an object
+      if (typeof data === 'string') data = JSON.parse(data);
+      if (data.videoId) {
+        createYouTubePlayer(data.videoId);
+      }
+    });
+
+    // Start the receiver
+    context.start();
+  </script>
+</body>
+</html>
